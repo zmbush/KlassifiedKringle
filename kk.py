@@ -8,6 +8,10 @@ import os
 from dotenv import load_dotenv
 from discord.ext import commands
 import state
+import urllib
+import re
+import csv
+import io
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -50,5 +54,40 @@ async def end(ctx):
     state = states.get(ctx.guild.id)
     await ctx.send("Ending: {0[type]}".format(state.data))
     state.data.clear()
+
+
+@bot.command(
+    help='loads a google doc'
+)
+async def load(ctx, doc_url):
+    async with ctx.typing():
+        await ctx.message.delete()
+        parts = re.match(
+            'https://docs.google.com/spreadsheets/d/([^/]+).*', doc_url)
+        if not parts:
+            await ctx.send("Unable to parse google sheets url")
+            return
+        file = urllib.request.urlopen(
+            'https://docs.google.com/spreadsheets/d/{}/export?format=csv'
+            .format(parts.group(1)))
+        response = [
+            "```",
+            "Secret Santa Data",
+            "```",
+        ]
+        text = file.read().decode('utf-8')
+        reader = csv.DictReader(io.StringIO(text))
+        user_field = reader.fieldnames[0]
+        for person in reader:
+            member = ctx.guild.get_member_named(person[user_field].strip())
+            response.append(member.mention if member else person[user_field])
+            response.append('-------------')
+            for key, value in person.items():
+                if user_field != key:
+                    response.append(
+                        "{key}: {value}".format(key=key, value=value))
+            response.append("")
+
+        await ctx.send('\n'.join(response))
 
 bot.run(os.getenv('BOT_TOKEN'))
