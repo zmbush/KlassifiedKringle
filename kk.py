@@ -12,6 +12,7 @@ import urllib
 import re
 import csv
 import io
+import random
 
 dotenv_path = os.path.join(os.path.dirname(__file__), '.env')
 load_dotenv(dotenv_path)
@@ -27,7 +28,7 @@ states = state.State(state_path)
 
 @bot.listen()
 async def on_ready():
-    print("We have logged in as {0.user}".format(bot))
+    print(f"We have logged in as {bot.user}")
 
 
 @bot.command(
@@ -48,7 +49,7 @@ async def begin(ctx, begin_type):
 
 
 @bot.command(
-    help='Ends the assugnments.'
+    help='Ends the assignments.'
 )
 async def end(ctx):
     state = states.get(ctx.guild.id)
@@ -61,33 +62,87 @@ async def end(ctx):
 )
 async def load(ctx, doc_url):
     async with ctx.typing():
+        author_dm = ctx.message.author.dm_channel
+        if not author_dm:
+            author_dm = await ctx.message.author.create_dm()
         await ctx.message.delete()
+
         parts = re.match(
             'https://docs.google.com/spreadsheets/d/([^/]+).*', doc_url)
         if not parts:
-            await ctx.send("Unable to parse google sheets url")
+            await author_dm.send("Unable to parse google sheets url")
             return
         file = urllib.request.urlopen(
             'https://docs.google.com/spreadsheets/d/{}/export?format=csv'
             .format(parts.group(1)))
-        response = [
-            "```",
-            "Secret Santa Data",
-            "```",
-        ]
         text = file.read().decode('utf-8')
         reader = csv.DictReader(io.StringIO(text))
-        user_field = reader.fieldnames[0]
+        user_field = reader.fieldnames[1]
+        errors = []
+        participants = []
         for person in reader:
             member = ctx.guild.get_member_named(person[user_field].strip())
-            response.append(member.mention if member else person[user_field])
-            response.append('-------------')
-            for key, value in person.items():
-                if user_field != key:
-                    response.append(
-                        "{key}: {value}".format(key=key, value=value))
-            response.append("")
+            if member:
+                person['mention'] = member.mention
+                person['id'] = member.id
+                participants.append(person)
+            else:
+                errors.append(
+                    f"Unable to find member named: `{person[user_field]}`")
 
-        await ctx.send('\n'.join(response))
+        if errors:
+            errors_str = '\n'.join(errors)
+            await author_dm.send(f"*Errors*:\n{errors_str}")
+        else:
+            shuffle_times = random.randint(5, 10)
+            for _ in range(shuffle_times):
+                random.shuffle(participants)
+            await author_dm.send(f"Loaded {len(participants)} participants, and shuffled them {shuffle_times} times")
+            state = states.get(ctx.guild.id)
+            state.data['participants'] = participants
+
+
+@bot.command(
+    help='Sends secret santa assignemnts to the appropriate users.'
+)
+async def send_assignments(ctx):
+    await ctx.message.delete()
+    state = states.get(ctx.guild.id)
+    author_dm = ctx.message.author.dm_channel
+    if not author_dm:
+        author_dm = await ctx.message.author.create_dm()
+    for i, participant in enumerate(state.data['participants']):
+        member = ctx.guild.get_member(participant['id'])
+        if not member:
+            await author_dm.send(
+                f"Unable to find user with id: {participant['id']}."
+                " Maybe they left the server?")
+            continue
+        if member == bot.user:
+            continue
+        dm = member.dm_channel
+        if not dm:
+            dm = await member.create_dm()
+        assignment = state.data['participants'][(i+1) % len(state.data['participants'])]
+        message = f"""Hello {participant['mention']}! You have been assigned {assignment['mention']} for Secret Santa!
+
+When preparing your gift for {assignment['mention']} please keep in mind the following:"""
+
+        for key, value in assignment.items():
+            if key in ['id', 'mention', 'Timestamp']:
+                continue
+            if not value.strip():
+                continue
+            key = key.strip().strip(':')
+            msg = '\n> '.join(value.split('\n'))
+            caveat = f"**{key}**:\n> {msg}\n"
+            if len(message) + len(caveat) + 1 > 2000:
+                await dm.send(message)
+                message = f"""Secret Santa info for {assignment['mention']} (continued)
+{caveat}"""
+            else:
+                message += "\n" + caveat
+
+        await dm.send(message)
 
 bot.run(os.getenv('BOT_TOKEN'))
