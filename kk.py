@@ -32,32 +32,6 @@ async def on_ready():
 
 
 @bot.command(
-    help='reply with whatever message is provided.',
-    aliases=['reply']
-)
-async def say(ctx, msg):
-    await ctx.send(msg)
-
-
-@bot.command(
-    help='Starts secret santa assignments.'
-)
-async def begin(ctx, begin_type):
-    state = states.get(ctx.guild.id)
-    state.data['type'] = begin_type
-    await ctx.send("Starting...")
-
-
-@bot.command(
-    help='Ends the assignments.'
-)
-async def end(ctx):
-    state = states.get(ctx.guild.id)
-    await ctx.send("Ending: {0[type]}".format(state.data))
-    state.data.clear()
-
-
-@bot.command(
     help='loads a google doc'
 )
 async def load(ctx, doc_url):
