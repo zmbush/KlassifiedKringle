@@ -6,7 +6,7 @@
 import discord
 import os
 
-# from dotenv import load_dotenv
+from dotenv import find_dotenv, load_dotenv
 from discord.ext import commands
 import state
 import urllib
@@ -15,8 +15,7 @@ import csv
 import io
 import random
 
-# dotenv_path = os.path.join(os.path.dirname(__file__), ".env")
-# load_dotenv(dotenv_path)
+load_dotenv(find_dotenv())
 
 state_path = os.path.join(os.path.dirname(__file__), "kk.state")
 
@@ -132,5 +131,4 @@ When preparing your gift for {assignment['mention']} please keep in mind the fol
         await dm.send(message)
 
 
-bot.run("/* BOT TOKEN HERE */")
-# bot.run(os.getenv("BOT_TOKEN"))
+bot.run(os.getenv("BOT_TOKEN"))
