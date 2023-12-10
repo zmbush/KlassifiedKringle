@@ -132,5 +132,5 @@ When preparing your gift for {assignment['mention']} please keep in mind the fol
         await dm.send(message)
 
 
-bot.run("Nzc0ODQ2ODYxNDcxMjUyNDgw.X6duXw.bC4HqGGXZ-xG4k-eH1j-vhrIvRo")
+bot.run("/* BOT TOKEN HERE */")
 # bot.run(os.getenv("BOT_TOKEN"))
